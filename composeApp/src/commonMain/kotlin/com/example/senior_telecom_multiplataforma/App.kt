@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.automirrored.filled.ArrowBackIos
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,30 +27,51 @@ val IosBackgroundColor = Color(0xFFF2F2F7)
 val IosBlue = Color(0xFF007AFF)
 val SeniorBlue = Color(0xFF005691)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun App() {
     var showWebView by remember { mutableStateOf(false) }
 
     MaterialTheme {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = IosBackgroundColor // Fundo cinza padrão iOS
-        ) {
-            Box(modifier = Modifier.safeDrawingPadding()) {
-                if (showWebView) {
-                    Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
-                        TextButton(
-                            onClick = { showWebView = false },
-                            modifier = Modifier.padding(8.dp)
-                        ) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowForwardIos, contentDescription = null, modifier = Modifier.size(12.dp).padding(end = 4.dp))
-                            Text("Voltar", color = IosBlue)
-                        }
-                        MyWebView(
-                            url = "https://centralixc.seniortelecom.com.br/central_assinante_web/login",
-                            modifier = Modifier.fillMaxSize()
+        Scaffold(
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = {
+                        Text(
+                            text = if (showWebView) "Central do Assinante" else "Senior Telecom",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.SemiBold
                         )
-                    }
+                    },
+                    navigationIcon = {
+                        if (showWebView) {
+                            TextButton(onClick = { showWebView = false }) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.ArrowBackIos,
+                                        contentDescription = "Voltar",
+                                        tint = IosBlue,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text("Voltar", color = IosBlue, fontSize = 17.sp)
+                                }
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = IosBackgroundColor,
+                        titleContentColor = Color.Black
+                    )
+                )
+            },
+            containerColor = IosBackgroundColor
+        ) { paddingValues ->
+            Box(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
+                if (showWebView) {
+                    MyWebView(
+                        url = "https://centralixc.seniortelecom.com.br/central_assinante_web/login",
+                        modifier = Modifier.fillMaxSize().background(Color.White)
+                    )
                 } else {
                     HomeScreen(onLoginClick = { showWebView = true })
                 }
