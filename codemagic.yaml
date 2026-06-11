@@ -8,12 +8,15 @@ workflows:
       groups:
         - target
     scripts:
-      - name: Set up local.properties
+      - name: Set up local.properties and Environment
         script: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
-
+      
       - name: Build do Aplicativo iOS (.app)
         script: |
+          # Inicializa o ambiente Java correto para o Gradle rodar dentro do Xcode
+          export JAVA_HOME=$JAVA_HOME_INTEL_21 || export JAVA_HOME=$JAVA_HOME
+          
           cd iosApp
           xcodebuild -project iosApp.xcodeproj \
                      -scheme iosApp \
