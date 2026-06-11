@@ -11,11 +11,7 @@ workflows:
       - name: Set up local.properties
         script: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
-      
-      - name: Compilar Framework Kotlin para iOS
-        script: |
-          ./gradlew :composeApp:compileFrameworkIosSimulatorArm64
-      
+
       - name: Build do Aplicativo iOS (.app)
         script: |
           cd iosApp
