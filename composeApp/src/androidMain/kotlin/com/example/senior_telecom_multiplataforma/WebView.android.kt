@@ -4,27 +4,25 @@ import android.graphics.Bitmap
 import android.view.ViewGroup
 import android.webkit.*
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 
 @Composable
 actual fun MyWebView(url: String, modifier: Modifier) {
-    // Estados para controlar a UI reativa
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
+    
+    // Usamos um estado simples para o refresh
+    var isRefreshing by remember { mutableStateOf(false) }
 
-    // Gerenciador do Botão Voltar (Igual ao seu OnBackPressed nativo)
-    // Se o site puder voltar, ele volta. Se não, o app fecha.
     BackHandler(enabled = webViewInstance?.canGoBack() == true) {
         webViewInstance?.goBack()
     }
@@ -33,37 +31,39 @@ actual fun MyWebView(url: String, modifier: Modifier) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { context ->
-                WebView(context).apply {
-                    webViewInstance = this
+                // Criamos o SwipeRefreshLayout programaticamente
+                val swipeRefresh = androidx.swiperefreshlayout.widget.SwipeRefreshLayout(context)
+                val webView = WebView(context)
+                
+                webViewInstance = webView
 
-                    // FORÇA O WEBVIEW A PREENCHER TODO O ESPAÇO (Resolve o bug da tela branca)
+                webView.apply {
                     layoutParams = ViewGroup.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT
                     )
 
-                    // --- SUAS CONFIGURAÇÕES NATIVAS ---
                     settings.apply {
                         javaScriptEnabled = true
-                        domStorageEnabled = true // Essencial para o portal de login IXC
+                        domStorageEnabled = true
                         databaseEnabled = true
                         cacheMode = WebSettings.LOAD_DEFAULT
                         useWideViewPort = true
                         loadWithOverviewMode = true
-                        builtInZoomControls = true
-                        displayZoomControls = false
                     }
 
                     webViewClient = object : WebViewClient() {
                         override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                             super.onPageStarted(view, url, favicon)
-                            isLoading = true
+                            if (!isRefreshing) isLoading = true
                             errorMessage = null
                         }
 
                         override fun onPageFinished(view: WebView?, url: String?) {
                             super.onPageFinished(view, url)
                             isLoading = false
+                            isRefreshing = false
+                            swipeRefresh.isRefreshing = false
                         }
 
                         override fun onReceivedError(
@@ -71,50 +71,47 @@ actual fun MyWebView(url: String, modifier: Modifier) {
                             request: WebResourceRequest?,
                             error: WebResourceError?
                         ) {
-                            // Trata apenas erros no frame principal (carregamento da página)
                             if (request?.isForMainFrame == true) {
-                                val errorCode = error?.errorCode
-                                errorMessage = when (errorCode) {
-                                    -2, -6, -8 -> "Ops! O sistema está fora do ar.\nTente novamente mais tarde."
-                                    -10 -> "Sem conexão com a internet.\nVerifique seu Wi-Fi ou dados móveis."
-                                    else -> "Ocorreu um erro ao carregar a página."
-                                }
+                                errorMessage = "Ocorreu um erro ao carregar a página."
                                 isLoading = false
+                                isRefreshing = false
+                                swipeRefresh.isRefreshing = false
                             }
                         }
                     }
                     loadUrl(url)
                 }
-            },
-            update = { webView ->
-                // Evita recarregar a página se a URL for a mesma ou se houver erro
-                if (webView.url != url && errorMessage == null) {
-                    webView.loadUrl(url)
+
+                swipeRefresh.apply {
+                    addView(webView)
+                    setOnRefreshListener {
+                        isRefreshing = true
+                        webView.reload()
+                    }
                 }
+                swipeRefresh
+            },
+            update = { swipeRefresh ->
+                // O update garante que o WebView reflita mudanças de URL se necessário
             }
         )
 
-        // --- UI DE CARREGAMENTO (CircularProgressIndicator) ---
-        if (isLoading) {
+        if (isLoading && !isRefreshing) {
             CircularProgressIndicator(
                 modifier = Modifier.align(Alignment.Center)
             )
         }
 
-        // --- UI DE ERRO (Centralizada na tela) ---
         errorMessage?.let { msg ->
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
+                modifier = Modifier.fillMaxSize().background(Color.White).padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
                 Text(text = msg)
-                Spacer(modifier = Modifier.height(16.dp))
                 Button(onClick = {
                     errorMessage = null
-                    webViewInstance?.loadUrl(url)
+                    webViewInstance?.reload()
                 }) {
                     Text("Tentar Novamente")
                 }

@@ -1,0 +1,30 @@
+workflows:
+  ios-compose-build:
+    name: Build iOS Compose Multiplatform
+    max_build_duration: 60
+    instance_type: mac_mini_m1
+    environment:
+      xcode: latest
+      groups:
+        - target
+    scripts:
+      - name: Set up local.properties
+        script: |
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
+      
+      - name: Compilar Framework Kotlin para iOS
+        script: |
+          ./gradlew :composeApp:compileFrameworkIosSimulatorArm64
+      
+      - name: Build do Aplicativo iOS (.app)
+        script: |
+          cd iosApp
+          xcodebuild -project iosApp.xcodeproj \
+                     -scheme iosApp \
+                     -sdk iphonesimulator \
+                     -configuration Debug \
+                     -derivedDataPath build \
+                     CODE_SIGNING_ALLOWED=NO \
+                     COMPILER_INDEX_STORE_ENABLE=NO
+    artifacts:
+      - iosApp/build/Build/Products/Debug-iphonesimulator/*.app

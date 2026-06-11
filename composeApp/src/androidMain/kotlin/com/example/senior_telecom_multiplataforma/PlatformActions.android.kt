@@ -7,14 +7,16 @@ import androidx.compose.ui.platform.LocalContext
 
 @Composable
 actual fun openDialer(phoneNumber: String) {
-    // No Android, usamos o contexto para disparar a Intent de discagem
     val context = LocalContext.current
+    // Limpa o número: remove espaços, parênteses e traços
+    val cleanNumber = phoneNumber.replace(Regex("[^0-9+]"), "")
     val intent = Intent(Intent.ACTION_DIAL).apply {
-        data = Uri.parse("tel:$phoneNumber")
+        data = Uri.parse("tel:$cleanNumber")
     }
     context.startActivity(intent)
 }
 
 actual fun makePhoneCall(phoneNumber: String) {
-    // Implementação caso precise chamar fora de um Composable
+    // Para chamadas fora de composables, poderíamos usar um static context ou similar, 
+    // mas para simplificar, a ação principal está no openDialer.
 }

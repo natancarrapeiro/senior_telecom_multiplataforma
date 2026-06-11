@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Info
@@ -21,6 +23,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
+import com.example.senior_telecom_multiplataforma.RemoteConfigManager.toColor
 
 // Cores Estilo iOS
 val IosBackgroundColor = Color(0xFFF2F2F7)
@@ -30,7 +34,12 @@ val SeniorBlue = Color(0xFF005691)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun App() {
-    var showWebView by remember { mutableStateOf(false) }
+    var currentScreen by remember { mutableStateOf("home") }
+
+    // Inicializa o Remote Config ao abrir o app
+    LaunchedEffect(Unit) {
+        RemoteConfigManager.fetchAndActivate()
+    }
 
     MaterialTheme {
         Scaffold(
@@ -38,14 +47,18 @@ fun App() {
                 CenterAlignedTopAppBar(
                     title = {
                         Text(
-                            text = if (showWebView) "Central do Assinante" else "Senior Telecom",
+                            text = when(currentScreen) {
+                                "webview" -> "Central do Assinante"
+                                "support" -> "Autoatendimento"
+                                else -> "Senior Telecom"
+                            },
                             fontSize = 17.sp,
                             fontWeight = FontWeight.SemiBold
                         )
                     },
                     navigationIcon = {
-                        if (showWebView) {
-                            TextButton(onClick = { showWebView = false }) {
+                        if (currentScreen != "home") {
+                            TextButton(onClick = { currentScreen = "home" }) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
                                         Icons.AutoMirrored.Filled.ArrowBackIos,
@@ -67,13 +80,16 @@ fun App() {
             containerColor = IosBackgroundColor
         ) { paddingValues ->
             Box(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
-                if (showWebView) {
-                    MyWebView(
+                when (currentScreen) {
+                    "webview" -> MyWebView(
                         url = "https://centralixc.seniortelecom.com.br/central_assinante_web/login",
                         modifier = Modifier.fillMaxSize().background(Color.White)
                     )
-                } else {
-                    HomeScreen(onLoginClick = { showWebView = true })
+                    "support" -> SupportDetailScreen()
+                    else -> HomeScreen(
+                        onLoginClick = { currentScreen = "webview" },
+                        onSupportClick = { currentScreen = "support" }
+                    )
                 }
             }
         }
@@ -81,7 +97,64 @@ fun App() {
 }
 
 @Composable
-fun HomeScreen(onLoginClick: () -> Unit) {
+fun PromotionBannerCarousel() {
+    val promotions by RemoteConfigManager.promotions.collectAsState()
+    val pagerState = rememberPagerState(pageCount = { promotions.size })
+
+    // Auto-scroll a cada 4 segundos
+    LaunchedEffect(promotions.size) {
+        if (promotions.size > 1) {
+            while (true) {
+                delay(4000)
+                val nextPage = (pagerState.currentPage + 1) % promotions.size
+                pagerState.animateScrollToPage(nextPage)
+            }
+        }
+    }
+
+    HorizontalPager(
+        state = pagerState,
+        modifier = Modifier.fillMaxWidth().height(160.dp)
+    ) { pageIndex ->
+        val promo = promotions[pageIndex]
+        Card(
+            modifier = Modifier.fillMaxSize(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = promo.color.toColor()),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Box(modifier = Modifier.fillMaxSize().padding(20.dp)) {
+                Column(modifier = Modifier.align(Alignment.BottomStart)) {
+                    Text("PROMOÇÃO", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(promo.title, color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 24.sp)
+                    Text("Por apenas ${promo.price}", color = Color.White.copy(alpha = 0.9f))
+                }
+                
+                // Indicador de página (bolinhas)
+                if (promotions.size > 1) {
+                    Row(
+                        modifier = Modifier.align(Alignment.TopEnd),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        promotions.forEachIndexed { index, _ ->
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .background(
+                                        color = if (pagerState.currentPage == index) Color.White else Color.White.copy(alpha = 0.3f),
+                                        shape = RoundedCornerShape(50)
+                                    )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun HomeScreen(onLoginClick: () -> Unit, onSupportClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -89,27 +162,12 @@ fun HomeScreen(onLoginClick: () -> Unit) {
             .padding(horizontal = 20.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // --- BANNER PREMIUM ---
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(160.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = SeniorBlue),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-        ) {
-            Box(modifier = Modifier.fillMaxSize().padding(20.dp)) {
-                Column(modifier = Modifier.align(Alignment.BottomStart)) {
-                    Text("PROMOÇÃO", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Text("Internet 500 Mega", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 24.sp)
-                    Text("Por apenas R$ 99,90", color = Color.White.copy(alpha = 0.9f))
-                }
-            }
-        }
+        // --- BANNER INTERATIVO COM REMOTE CONFIG ---
+        PromotionBannerCarousel()
 
         Spacer(Modifier.height(24.dp))
 
-        // --- BOTÃO ÁREA LOGADA (Estilo Botão iOS) ---
+        // --- BOTÃO ÁREA LOGADA ---
         Button(
             onClick = onLoginClick,
             modifier = Modifier.fillMaxWidth().height(52.dp),
@@ -123,24 +181,24 @@ fun HomeScreen(onLoginClick: () -> Unit) {
 
         Spacer(Modifier.height(32.dp))
 
-        // --- SEÇÃO AGROPADA: SUPORTE ---
+        // --- SEÇÃO SUPORTE ---
         SectionHeader("SUPORTE E AJUDA")
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().clickable { onSupportClick() },
             shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             SupportItem(
                 icon = Icons.Default.Info,
-                title = "Conexão Lenta?",
-                description = "Veja como resetar o sinal."
+                title = "Conexão Lenta ou Caindo?",
+                description = "Veja como resolver agora."
             )
         }
 
         Spacer(Modifier.height(24.dp))
 
-        // --- SEÇÃO AGRUPADA: TELEFONES ---
+        // --- SEÇÃO TELEFONES ---
         SectionHeader("CONTATOS ÚTEIS")
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -195,11 +253,77 @@ fun SupportItem(icon: ImageVector, title: String, description: String) {
 }
 
 @Composable
+fun SupportDetailScreen() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp, vertical = 16.dp)
+    ) {
+        SectionHeader("1. SEM CONEXÃO")
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                TipItem("Verifique se os aparelhos estão ligados na tomada.")
+                TipItem("Verifique se há alguma luz vermelha nos aparelhos (Modem/Roteador).")
+                TipItem("Confirme se o sinal do Wi-Fi aparece na tela do seu celular.")
+                TipItem("DICA MESTRA: Retire os aparelhos da tomada, aguarde 1 minuto e ligue-os novamente.")
+            }
+        }
+
+        Spacer(Modifier.height(32.dp))
+
+        SectionHeader("2. CONEXÃO LENTA")
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                TipItem("Verifique se a lentidão ocorre em todos os aparelhos (TV, Celular, PC).")
+                TipItem("Confirme em qual rede está conectado (Redes 5G são mais rápidas que 2G).")
+                TipItem("Se estiver no PC ou TV, prefira usar o cabo de rede para mais estabilidade.")
+                TipItem("Verifique a distância entre você e o roteador (paredes diminuem o sinal).")
+            }
+        }
+        
+        Spacer(Modifier.height(32.dp))
+        
+        Text(
+            "Se o problema persistir, entre em contato com nosso suporte técnico pelos telefones na tela inicial.",
+            fontSize = 13.sp,
+            color = Color.Gray,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+    }
+}
+
+@Composable
+fun TipItem(text: String) {
+    Row(modifier = Modifier.padding(vertical = 8.dp)) {
+        Text("•", color = IosBlue, fontWeight = FontWeight.Bold, modifier = Modifier.padding(end = 8.dp))
+        Text(text, fontSize = 15.sp, color = Color.DarkGray)
+    }
+}
+
+@Composable
 fun PhoneItem(name: String, number: String) {
+    var triggerCall by remember { mutableStateOf(false) }
+    
+    if (triggerCall) {
+        openDialer(number)
+        SideEffect { triggerCall = false }
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { makePhoneCall(number) }
+            .clickable { triggerCall = true }
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

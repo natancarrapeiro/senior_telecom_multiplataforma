@@ -10,7 +10,9 @@ actual fun openDialer(phoneNumber: String) {
 }
 
 actual fun makePhoneCall(phoneNumber: String) {
-    val url = NSURL(string = "tel:$phoneNumber")
+    // Limpa o número para o iOS também
+    val cleanNumber = phoneNumber.replace(Regex("[^0-9+]"), "")
+    val url = NSURL(string = "tel:$cleanNumber")
     if (UIApplication.sharedApplication.canOpenURL(url)) {
         UIApplication.sharedApplication.openURL(url)
     }
